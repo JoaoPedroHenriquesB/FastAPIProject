@@ -1,13 +1,14 @@
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from schemas.users_schema import Token
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database.db_config import get_session
 from app.models.user_model import UserModel
 from app.routers.users_router import router
-from app.utils.hash_password import hash_password, verify_password
+from app.schemas.users_schema import Token
+from app.utils.hash_password import verify_password
+from app.utils.token import create_token
 
 app = FastAPI(title="My First API")
 app.include_router(router)
@@ -33,3 +34,6 @@ async def login_token(
 
     if not verify_password(form_data.password, user.password):
         raise HTTPException(401, detail="Incorrect Email or Password")
+
+    access_token = create_token({"sub": user.email})
+    return {"access_token": access_token, "token_type": "Bearer"}

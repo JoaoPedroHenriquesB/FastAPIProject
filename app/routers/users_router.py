@@ -7,10 +7,9 @@ from app.database.db_config import get_session
 from app.models.user_model import UserModel
 from app.schemas.users_schema import UserCreateSchema, UserList, UserPublic
 from app.utils.hash_password import hash_password
+from app.utils.token import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-database = []
 
 
 # CREATE
@@ -55,7 +54,10 @@ async def create_user(
 # READ
 @router.get("/read", status_code=200, response_model=UserList)
 async def get_all_users(
-    limit: int = 10, offset: int = 0, session: Session = Depends(get_session)
+    limit: int = 10,
+    offset: int = 0,
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
 ) -> dict:
 
     try:
@@ -84,39 +86,45 @@ async def get_user_id(
 # UPDATE
 @router.put("/update/{user_id}", status_code=200, response_model=UserPublic)
 async def update_user(
-    user_id: int, user: UserCreateSchema, session: Session = Depends(get_session)
+    user_id: int,
+    user: UserCreateSchema,
+    session: Session = Depends(get_session),
+    current_user: UserModel = Depends(get_current_user),
 ) -> UserPublic:
 
-    db = session.scalar(select(UserModel).where(UserModel.id == user_id))
-    if not db:
-        raise HTTPException(404, detail="User Not Found")
-
-    db.name = user.name
-    db.email = user.email
-    db.password = hash_password(user.password)
-    db.phone_number = user.phone_number
+    if current_user.id != user_id:
+        raise HTTPException(403, detail="Not Enough Permissions")
 
     try:
-        session.add(db)
-        session.commit()
-        session.refresh(db)
-        return UserPublic.model_validate(db)
+        current_user.name = user.name
+        current_user.email = user.email
+        current_user.password = hash_password(user.password)
+        current_user.phone_number = user.phone_number
 
-    except IntegrityError:
+        session.add(current_user)
+        session.commit()
+        session.refresh(current_user)
+        
+        return UserPublic.model_validate(current_user)
+
+    except:
         session.rollback()
         raise HTTPException(409, detail="Email or Phone Number Already Exists")
 
 
 # DELETE
 @router.delete("/delete/{user_id}", status_code=200)
-async def delete_user(user_id: int, session: Session = Depends(get_session)) -> dict:
+async def delete_user(
+    user_id: int,
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
+) -> dict:
 
-    db = session.scalar(select(UserModel).where(UserModel.id == user_id))
-    if not db:
-        raise HTTPException(404, detail=f"User with id: {user_id}, not found")
+    if current_user.id != user_id:
+        raise HTTPException(403, detail="Not Enough Permissions")
 
     try:
-        session.delete(db)
+        session.delete(current_user)
         session.commit()
         return {"message": f"User id: {user_id}, deleted from database"}
 
@@ -124,6 +132,3 @@ async def delete_user(user_id: int, session: Session = Depends(get_session)) -> 
         session.rollback()
         print(f"ERROR: {e}")
         raise HTTPException(500, detail="Internal Error")
-
-
-# TOKEN
