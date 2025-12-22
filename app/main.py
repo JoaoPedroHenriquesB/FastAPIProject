@@ -1,39 +1,14 @@
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
 
-from app.database.db_config import get_session
-from app.models.user_model import UserModel
-from app.routers.users_router import router
-from app.schemas.users_schema import Token
-from app.utils.hash_password import verify_password
-from app.utils.token import create_token
+from app.routers.auth_router import auth_router
+from app.routers.user_router import user_router
 
-app = FastAPI(title="My First API")
-app.include_router(router)
+app = FastAPI(title="My First APP")
+
+app.include_router(auth_router)
+app.include_router(user_router)
 
 
 @app.get("/")
 async def main():
     return {"message": "Hello World"}
-
-
-@app.post("/token", response_model=Token)
-async def login_token(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    session: Session = Depends(get_session),
-):
-
-    user = session.scalar(
-        select(UserModel).where(UserModel.email == form_data.username)
-    )
-
-    if not user:
-        raise HTTPException(401, detail="Incorrect Email or Password")
-
-    if not verify_password(form_data.password, user.password):
-        raise HTTPException(401, detail="Incorrect Email or Password")
-
-    access_token = create_token({"sub": user.email})
-    return {"access_token": access_token, "token_type": "Bearer"}

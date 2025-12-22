@@ -7,12 +7,13 @@ from jwt import decode, encode
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config.settings import settings
 from app.database.db_config import get_session
 from app.models.user_model import UserModel
 
-SECRET_KEY = "secret_key"
-ALGORITHM = "HS256"
-TOKEN_EXPIRE = 10
+SECRET_KEY = settings.SECRET_KEY
+TOKEN_EXPIRE = settings.TOKEN_EXPIRE
+ALGORITHM = settings.ALGORITHM
 
 
 def create_token(data: dict) -> str:
@@ -24,7 +25,7 @@ def create_token(data: dict) -> str:
     return encoded_jwt
 
 
-oauth2_schema = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_schema = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 def get_current_user(

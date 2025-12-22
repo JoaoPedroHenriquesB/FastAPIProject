@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # schema to create users
@@ -27,3 +27,8 @@ class UserList(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class FilterPage(BaseModel):
+    offset: int = Field(ge=0, default=0)
+    limit: int = Field(ge=1, default=100)

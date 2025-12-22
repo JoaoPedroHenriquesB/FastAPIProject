@@ -1,27 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database.db_config import get_session
 from app.models.user_model import UserModel
-from app.schemas.users_schema import UserCreateSchema, UserList, UserPublic
+from app.schemas.users_schema import FilterPage, UserCreateSchema, UserList, UserPublic
 from app.services.user_services import UserService
-from app.utils.hash_password import hash_password
 from app.utils.token import get_current_user
 
-router = APIRouter(prefix="/users", tags=["users"])
+user_router = APIRouter(prefix="/users", tags=["users"])
 
 
 def user_service(session: Session = Depends(get_session)) -> UserService:
     return UserService(session)
 
 
-# CREATE
-@router.post("/create", status_code=201, response_model=UserPublic)
-async def create_user(
-    user_data: UserCreateSchema, service: UserService = Depends(user_service)
-):  # -> UserPublic:
+Service = Annotated[UserService, Depends(user_service)]
+CurrentUser = Annotated[UserModel, Depends(get_current_user)]
+T_FilterPage = Annotated[FilterPage, Query()]
 
+
+# CREATE
+@user_router.post("/create", status_code=201, response_model=UserPublic)
+async def create_user(user_data: UserCreateSchema, service: Service):  # -> UserPublic:
     try:
         return service.create_user(user_data)
 
@@ -33,27 +35,20 @@ async def create_user(
 
 
 # READ
-@router.get("/read", status_code=200, response_model=UserList)
+@user_router.get("/read", status_code=200, response_model=UserList)
 async def get_all_users(
-    limit: int = 10,
-    offset: int = 0,
-    service: UserService = Depends(user_service),
-    current_user=Depends(get_current_user),
+    service: Service, current_user: CurrentUser, filter_get: T_FilterPage
 ) -> dict:
-
     try:
-        all_users = service.list_users(limit, offset)
+        all_users = service.list_users(filter_get.limit, filter_get.offset)
         return {"users": all_users}
     except Exception as e:
         print(f"ERROR: {e}")
         raise HTTPException(500, detail="Internal Error")
 
 
-@router.get("/read/{user_id}", status_code=200, response_model=UserPublic)
-async def get_user_id(
-    user_id: int, service: UserService = Depends(user_service)
-) -> UserPublic:
-
+@user_router.get("/read/{user_id}", status_code=200, response_model=UserPublic)
+async def get_user_id(user_id: int, service: Service) -> UserPublic:
     try:
         user = service.find_by_id(user_id)
         return UserPublic.model_validate(user)
@@ -67,12 +62,12 @@ async def get_user_id(
 
 
 # UPDATE
-@router.put("/update/{user_id}", status_code=200, response_model=UserPublic)
+@user_router.put("/update/{user_id}", status_code=200, response_model=UserPublic)
 async def update_user(
     user_id: int,
     user: UserCreateSchema,
-    service: UserService = Depends(user_service),
-    current_user: UserModel = Depends(get_current_user),
+    service: Service,
+    current_user: CurrentUser,
 ):  # -> UserPublic:
 
     if current_user.id != user_id:
@@ -86,12 +81,11 @@ async def update_user(
 
 
 # DELETE
-@router.delete("/delete/{user_id}", status_code=200)
+@user_router.delete("/delete/{user_id}", status_code=200)
 async def delete_user(
+    current_user: CurrentUser,
+    service: Service,
     user_id: int,
-    session: Session = Depends(get_session),
-    current_user=Depends(get_current_user),
-    service: UserService = Depends(user_service),
 ) -> dict:
 
     if current_user.id != user_id:
@@ -101,6 +95,5 @@ async def delete_user(
         return service.user_delete(current_user)
 
     except Exception as e:
-        session.rollback()
         print(f"ERROR: {e}")
         raise HTTPException(500, detail="Internal Error")

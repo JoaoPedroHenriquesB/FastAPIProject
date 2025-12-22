@@ -62,7 +62,7 @@ class UserRepository:
         try:
             self.session.delete(user_id)
             self.session.commit()
-            return {"message": f"User deleted from database"}
+            return {"message": "User deleted from database"}
 
         except Exception as e:
             self.session.rollback()
