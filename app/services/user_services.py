@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user_model import UserModel
 from app.repositories.user_repository import UserRepository
@@ -7,20 +7,20 @@ from app.utils.hash_password import hash_password
 
 
 class UserService:
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         self.repository = UserRepository(session)
 
-    def create_user(self, user_data):
-        existing_user = self.repository.verify_data(
+    async def create_user(self, user_data):
+        existing_user = await self.repository.verify_data(
             user_data.email, user_data.phone_number
         )
 
         if existing_user:
-            if existing_user.email == UserModel.email:
-                raise ValueError("Email already exists")
+            if existing_user.email == user_data.email:
+                raise ValueError(400, "Email already exists")
 
-            if existing_user.phone_number == UserModel.phone_number:
-                raise ValueError("Phone Number already exists")
+            if existing_user.phone_number == user_data.phone_number:
+                raise ValueError(400, "Phone Number already exists")
 
         new_user = UserModel(
             name=user_data.name,
@@ -30,13 +30,13 @@ class UserService:
         )
 
         try:
-            return self.repository.new_user(new_user)
+            return await self.repository.new_user(new_user)
         except Exception as e:
             print(f"ERROR: {e}")
             raise HTTPException(500, detail="Internal Error")
 
-    def find_by_id(self, user_id: int):
-        user = self.repository.get_user_id(user_id)
+    async def find_by_id(self, user_id: int):
+        user = await self.repository.get_user_id(user_id)
 
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -46,15 +46,15 @@ class UserService:
 
         return user
 
-    def list_users(self, limit: int, offset: int):
-        users = self.repository.get_all(limit, offset)
+    async def list_users(self, limit: int, offset: int):
+        users = await self.repository.get_all(limit, offset)
         try:
             return users if users is not None else []
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
-    def update_user(self, user_data, user_id: int):
-        db_user = self.repository.get_user_id(user_id)
+    async def update_user(self, user_data, user_id: int):
+        db_user = await self.repository.get_user_id(user_id)
 
         if not db_user:
             raise ValueError("User not found")
@@ -65,15 +65,19 @@ class UserService:
         db_user.phone_number = user_data.phone_number
 
         try:
-            return self.repository.patch_user(db_user)
+            return await self.repository.patch_user(db_user)
 
         except Exception as e:
             print(f"ERROR: {e}")
             raise HTTPException(500, detail="Internal Error")
 
-    def user_delete(self, user_id):
+    async def user_delete(self, user_id):
+        db_user = await self.repository.get_user_id(user_id)
+        if not db_user:
+            raise HTTPException(status_code=400, detail="User not found")
+
         try:
-            return self.repository.delete_user(user_id)
+            return await self.repository.delete_user(user_id)
 
         except Exception as e:
             print(f"ERROR: {e}")

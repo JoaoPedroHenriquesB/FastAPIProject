@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jwt import decode, encode
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.database.db_config import get_session
@@ -28,8 +28,8 @@ def create_token(data: dict) -> str:
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
-def get_current_user(
-    session: Session = Depends(get_session), token: str = Depends(oauth2_schema)
+async def get_current_user(
+    session: AsyncSession = Depends(get_session), token: str = Depends(oauth2_schema)
 ):
 
     credentials_exception = HTTPException(
@@ -48,7 +48,9 @@ def get_current_user(
     except Exception:
         raise credentials_exception
 
-    user = session.scalar(select(UserModel).where(UserModel.email == subject_email))
+    user = await session.scalar(
+        select(UserModel).where(UserModel.email == subject_email)
+    )
     if not user:
         raise credentials_exception
 
