@@ -27,6 +27,7 @@ class UserService:
             email=user_data.email,
             password=hash_password(user_data.password),
             phone_number=user_data.phone_number,
+            is_admin=user_data.is_admin,
         )
 
         try:

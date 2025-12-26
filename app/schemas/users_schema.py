@@ -7,6 +7,7 @@ class UserCreateSchema(BaseModel):
     email: EmailStr
     password: str
     phone_number: str | None
+    is_admin: bool = False
 
 
 # this schema omit the password and add the id
@@ -15,6 +16,7 @@ class UserPublic(BaseModel):
     name: str
     email: EmailStr
     phone_number: str | None
+    is_admin: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

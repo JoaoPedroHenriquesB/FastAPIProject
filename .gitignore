@@ -6,7 +6,6 @@ __pycache__/
 #Project stuff
 database.db
 
-
 # C extensions
 *.so
 

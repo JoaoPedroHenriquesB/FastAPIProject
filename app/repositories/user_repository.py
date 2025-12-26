@@ -63,14 +63,16 @@ class UserRepository:
             print(f"ERROR: {e}")
             raise HTTPException(status_code=500, detail="Internal Error")
 
+    # delete a user
     async def delete_user(self, user_id):
         try:
             user_to_delete = await self.session.get(UserModel, user_id)
             await self.session.delete(user_to_delete)
             await self.session.commit()
-            return {"message": "User deleted from database"}
 
         except Exception as e:
             await self.session.rollback()
+            print(f"ERROR: {e}")
+            raise HTTPException(status_code=500, detail="Internal Error")
             print(f"ERROR: {e}")
             raise HTTPException(status_code=500, detail="Internal Error")

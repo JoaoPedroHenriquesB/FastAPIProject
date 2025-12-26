@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jwt import decode, encode
+from jwt import DecodeError, ExpiredSignatureError, decode, encode
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,33 +25,40 @@ def create_token(data: dict) -> str:
     return encoded_jwt
 
 
-oauth2_schema = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_schema = OAuth2PasswordBearer(
+    tokenUrl="auth/token", refreshUrl="auth/refresh_token"
+)
 
 
 async def get_current_user(
     session: AsyncSession = Depends(get_session), token: str = Depends(oauth2_schema)
 ):
-
-    credentials_exception = HTTPException(
-        401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     try:
         payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        subject_email = payload.get("sub")
+        email: str = payload.get("sub")
 
-        if not subject_email:
-            raise credentials_exception
+        if not email:
+            raise HTTPException(
+                status_code=401, detail="Could not validate credentials"
+            )
 
-    except Exception:
-        raise credentials_exception
+    except DecodeError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
 
-    user = await session.scalar(
-        select(UserModel).where(UserModel.email == subject_email)
-    )
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token already expired")
+
+    user = await session.scalar(select(UserModel).where(UserModel.email == email))
+
     if not user:
-        raise credentials_exception
+        raise HTTPException(401, detail="User not found")
 
     return user
+
+
+async def requires_admin(current_user: UserModel = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403, detail="Acesso negado: Requer privilégios de ADMIN"
+        )
+    return current_user
