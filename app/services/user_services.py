@@ -49,10 +49,16 @@ class UserService:
 
     async def list_users(self, limit: int, offset: int):
         users = await self.repository.get_all(limit, offset)
+
         try:
-            return users if users is not None else []
+            if not users:
+                HTTPException(status_code=404, detail="No users Found")
+
+            return users
+
         except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            print(f"ERROR: {e}")
+            raise HTTPException(500, detail="Internal Error")
 
     async def update_user(self, user_data, user_id: int):
         db_user = await self.repository.get_user_id(user_id)
@@ -74,6 +80,7 @@ class UserService:
 
     async def user_delete(self, user_id):
         db_user = await self.repository.get_user_id(user_id)
+
         if not db_user:
             raise HTTPException(status_code=400, detail="User not found")
 

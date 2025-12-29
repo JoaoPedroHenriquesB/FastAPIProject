@@ -74,5 +74,3 @@ class UserRepository:
             await self.session.rollback()
             print(f"ERROR: {e}")
             raise HTTPException(status_code=500, detail="Internal Error")
-            print(f"ERROR: {e}")
-            raise HTTPException(status_code=500, detail="Internal Error")

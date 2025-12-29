@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.db_config import get_session
 from app.models.user_model import UserModel
-from app.schemas.users_schema import FilterPage, UserCreateSchema, UserList, UserPublic
+from app.schemas.users_schema import UserCreateSchema, UserList, UserPublic
 from app.services.user_services import UserService
 from app.utils.token import get_current_user, requires_admin
-
+from app.utils.misc import FilterPage
 user_router = APIRouter(prefix="/users", tags=["users"])
 
 
@@ -24,28 +24,29 @@ T_Admin = Annotated[UserModel, Depends(requires_admin)]
 
 # CREATE
 @user_router.post("/create", status_code=201, response_model=UserPublic)
-async def create_user(
-    user_data: UserCreateSchema, service: T_Service
-):  # -> UserPublic:
+async def create_user(user_data: UserCreateSchema, service: T_Service):  # -> UserPublic:
     try:
         return await service.create_user(user_data)
 
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        print(f"ERROR: {e}")
+        raise HTTPException(500, detail="Internal Error")
 
-    except Exception:
-        raise HTTPException(status_code=500, detail="Internal Error")
+    except Exception as e:
+        print(f"ERROR: {e}")
+        raise HTTPException(500, detail="Internal Error")
 
 
 # READ
 @user_router.get("/read", status_code=200, response_model=UserList)
 async def get_all_users(
     service: T_Service, admin: T_Admin, filter_get: T_FilterPage
-) -> dict:
+)-> dict:
 
     try:
         all_users = await service.list_users(filter_get.limit, filter_get.offset)
         return {"users": all_users}
+
     except Exception as e:
         print(f"ERROR: {e}")
         raise HTTPException(500, detail="Internal Error")
@@ -53,18 +54,19 @@ async def get_all_users(
 
 @user_router.get("/read/{user_id}", status_code=200, response_model=UserPublic)
 async def get_user_id(
-    user_id: int, service: T_Service, current_user: T_CurrentUser
+    user_id: int, service: T_Service, admin: T_Admin
 ) -> UserPublic:
     try:
         user = await service.find_by_id(user_id)
         return UserPublic.model_validate(user)
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        print(f"ERROR: {e}")
+        raise HTTPException(500, detail="Internal Error")
 
     except Exception as e:
-        print(f"Unexpected Error: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        print(f"ERROR: {e}")
+        raise HTTPException(500, detail="Internal Error")
 
 
 # UPDATE
@@ -84,7 +86,8 @@ async def update_user(
         return await service.update_user(user, user_id)
 
     except Exception as e:
-        raise e
+        print(f"ERROR: {e}")
+        raise HTTPException(500, detail="Internal Error")
 
 
 # DELETE
