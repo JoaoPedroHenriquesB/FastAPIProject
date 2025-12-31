@@ -1,14 +1,17 @@
+import logging
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.db_config import get_session
 from app.models.task_model import TaskModel
 from app.models.user_model import UserModel
 from app.utils.token import get_current_user
+
+logger = logging.getLogger(__name__)
 
 T_CurrentUser = Annotated[UserModel, Depends(get_current_user)]
 T_Session = Annotated[AsyncSession, Depends(get_session)]
@@ -36,25 +39,30 @@ class TaskRepository:
             return task_model
 
         except SQLAlchemyError as e:
+            logger.error(f"database error: {e}")
             await self.session.rollback()
-            raise e
-
 
     # get all tasks
     async def list_tasks(self, limit: int, offset: int):
 
-        tasks = await self.session.scalars(select(TaskModel).limit(limit).offset(offset))
+        tasks = await self.session.scalars(
+            select(TaskModel).limit(limit).offset(offset)
+        )
         return tasks.all()
 
     # get all tasks from user id
-    async def get_tasks_from_user(self, user_id: int, task_filter, limit: int, offset: int):
+    async def get_tasks_from_user(
+        self, user_id: int, task_filter, limit: int, offset: int
+    ):
         query = select(TaskModel).where(TaskModel.user_id == user_id)
 
         if task_filter.title:
             query = query.filter(TaskModel.title.contains(task_filter.title))
 
         if task_filter.description:
-            query = query.filter(TaskModel.description.contains(task_filter.description))
+            query = query.filter(
+                TaskModel.description.contains(task_filter.description)
+            )
 
         if task_filter.state:
             query = query.filter(TaskModel.state.contains(task_filter.state))
@@ -72,8 +80,8 @@ class TaskRepository:
             return task_model
 
         except SQLAlchemyError as e:
+            logger.error(f"database error: {e}")
             await self.session.rollback()
-            raise e
 
     async def delete_task(self, task_id):
         try:
@@ -82,5 +90,5 @@ class TaskRepository:
             await self.session.commit()
 
         except SQLAlchemyError as e:
+            logger.error(f"database error: {e}")
             await self.session.rollback()
-            raise e

@@ -9,7 +9,7 @@ from app.schemas.task_schema import TaskList, TaskPublic, TaskSchema, TaskUpdate
 from app.services.task_service import TaskService
 from app.utils.misc import FilterTasks
 from app.utils.token import get_current_user, requires_admin
-from app.utils.task_exceptions import TaskNotFoundError
+from app.utils.exceptions import NotFoundError
 
 task_router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -49,7 +49,7 @@ async def tasks_from_user(service: T_Service,current_user: T_CurrentUser,task_fi
         tasks = await service.get_tasks_from_user(current_user, task_filter)
         return {"tasks": tasks}
 
-    except TaskNotFoundError:
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="task not found")
 
 # update user task

@@ -1,9 +1,18 @@
-from fastapi import HTTPException
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user_model import UserModel
 from app.repositories.user_repository import UserRepository
+from app.utils.exceptions import (
+    DuplicateEntityError,
+    InternalDomainError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from app.utils.hash_password import hash_password
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -17,10 +26,12 @@ class UserService:
 
         if existing_user:
             if existing_user.email == user_data.email:
-                raise ValueError(400, "Email already exists")
+                raise DuplicateEntityError("email", "email already exists")
 
             if existing_user.phone_number == user_data.phone_number:
-                raise ValueError(400, "Phone Number already exists")
+                raise DuplicateEntityError(
+                    "phone-number", "phone-number already exists"
+                )
 
         new_user = UserModel(
             name=user_data.name,
@@ -33,14 +44,14 @@ class UserService:
         try:
             return await self.repository.new_user(new_user)
         except Exception as e:
-            print(f"ERROR: {e}")
-            raise HTTPException(500, detail="Internal Error")
+            logger.exception(f"internal server error occured: {e}")
+            raise InternalDomainError()
 
     async def find_by_id(self, user_id: int):
         user = await self.repository.get_user_id(user_id)
 
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise NotFoundError()
 
         if user is None:
             raise ValueError("User not exists")
@@ -52,19 +63,22 @@ class UserService:
 
         try:
             if not users:
-                HTTPException(status_code=404, detail="No users Found")
+                raise NotFoundError()
 
             return users
 
         except ValueError as e:
-            print(f"ERROR: {e}")
-            raise HTTPException(500, detail="Internal Error")
+            logger.exception(e)
+            raise InternalDomainError()
 
-    async def update_user(self, user_data, user_id: int):
+    async def update_user(self, user_data, user_id: int, current_user):
         db_user = await self.repository.get_user_id(user_id)
 
+        if current_user.id != user_id:
+            raise PermissionDeniedError()
+
         if not db_user:
-            raise ValueError("User not found")
+            raise NotFoundError()
 
         db_user.name = user_data.name
         db_user.email = user_data.email
@@ -75,18 +89,18 @@ class UserService:
             return await self.repository.patch_user(db_user)
 
         except Exception as e:
-            print(f"ERROR: {e}")
-            raise HTTPException(500, detail="Internal Error")
+            logger.exception(e)
+            raise InternalDomainError()
 
     async def user_delete(self, user_id):
         db_user = await self.repository.get_user_id(user_id)
 
         if not db_user:
-            raise HTTPException(status_code=400, detail="User not found")
+            raise NotFoundError()
 
         try:
             return await self.repository.delete_user(user_id)
 
         except Exception as e:
-            print(f"ERROR: {e}")
-            raise HTTPException(500, detail="Internal Error")
+            logger.exception(e)
+            raise InternalDomainError()
